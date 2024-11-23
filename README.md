@@ -3,7 +3,8 @@
  Este código é um exemplo de um sistema de geração de artigos automatizado usando uma LLM (Linguagem de Modelos de Largura) e avaliação por um especialista em análise textual. O sistema é composto por três principais componentes: pesquisa web, geração de artigos e avaliação do artigo.
 
 Componentes do Sistema
-Pesquisa Web: O código usa a ferramenta TavilySearchResults do pacote langchain_community.tools.tavily_search para realizar pesquisas na web com base no tema do artigo. Os resultados são armazenados no estado do gráfico.
+Pesquisa Web: O código usa a ferramenta TavilySearchResults do pacote langchain_community.tools.tavily_search para realizar pesquisas na web com base no tema do artigo. 
+Os resultados são armazenados no estado do gráfico.
 Geração de Artigos: O código usa uma LLM, neste caso, ChatAnthropic, para gerar o artigo. O prompt de escrita é definido na variável prompt_escritor e o resultado é armazenado no estado do gráfico.
 Avaliação do Artigo: O código usa uma LLM, neste caso, ChatAnthropic, para avaliar o artigo. O prompt de avaliação é definido na variável prompt_critico e o resultado é armazenado no estado do gráfico.
 Fluxo do Sistema
