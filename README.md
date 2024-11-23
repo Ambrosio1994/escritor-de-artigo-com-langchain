@@ -1,4 +1,4 @@
-[Fluxo LangChain](writer_crtic.png)
+![Fluxo LangChain](writer_crtic.png)
  
  Este código é um exemplo de um sistema de geração de artigos automatizado usando uma LLM (Linguagem de Modelos de Largura) e avaliação por um especialista em análise textual. O sistema é composto por três principais componentes: pesquisa web, geração de artigos e avaliação do artigo.
 
