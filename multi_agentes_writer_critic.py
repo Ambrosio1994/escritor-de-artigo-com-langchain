@@ -1,3 +1,4 @@
+
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,19 +8,22 @@ from langgraph.graph import END, StateGraph, START
 
 from langchain_anthropic import ChatAnthropic
 
+import getpass
 import os
+
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 from typing import Annotated
 
+def _set_env(key: str):
+    if key not in os.environ:
+        os.environ[key] = getpass.getpass(f"{key}:")
 
-os.getenv("ANTHROPIC_API_KEY")
-os.getenv("TAVILY_API_KEY")
 
-model = "claude-3-5-sonnet-20241022"
-llm = ChatAnthropic(model=model,
-                    temperature=0,
-                    max_tokens=1000)
+_set_env("ANTHROPIC_API_KEY") 
+_set_env("TAVILY_API_KEY") 
+
+
 
 class GraphState(TypedDict):
     """
@@ -34,10 +38,9 @@ class GraphState(TypedDict):
 
     tema: str
     web_search: str
-    # redacao: str
     artigo : str
+    critica: str
     nota: float
-    # decisao: str
     iteracoes: int
 
 class Editor_Feedback(BaseModel):
@@ -60,51 +63,55 @@ web_search_tool = TavilySearchResults(k=5)
 system_escritor = """
 Você é um escritor profissional especializado em criar artigos informativos
 e envolventes. Sua tarefa é criar um artigo baseado no tema {tema}
-e nos materiais de apoio fornecidos.
+em seu conhecimento prévio e nos textos de apoio fornecidos. Use estes
+para refinar seu cohecimento e produzir um excelente texto para o usuario.
 
-Você poderá receber uma crítica sobre seu artigo e voce deve:
+Para criar o artigo, siga estas diretrizes:
 
-1. Observar os pontos fortes apontados pelo a avaliador
-2. Observar o que ele apontar que deve ser melhorado na sua escrita
+1. TEMA PRINCIPAL: {tema}
+2. TEXTOS DE APOIO: {web_search}
+3. SE HOUVER, ATENTAR PARA CRITICA DO AVALIADOR: {critica}
+
+3. ESTRUTURA SOLICITADA:
+- Título chamativo
+- Introdução envolvente
+- Desenvolvimento do tema em tópicos, se aprofundando nos paragrafos
+- Padronizar o formato das listas (alternam entre bullets e hífens)
+- Incluir uma seção de metodologia explicando a origem dos dados
+- Conclusão coerente e objetiva
+
+4. ELEMENTOS ADICIONAIS:
+- Inclua dados estatísticos relevantes dos textos de apoio
+- Adicione exemplos práticos
+- Utilize citações quando apropriado
+- Mantenha um fluxo natural entre os parágrafos
+
+5. OTIMIZAÇÃO:
+- Mantenha parágrafos concisos
+- Inclua palavras-chave naturalmente
+- Evite jargões desnecessários
+- Nas secoes incluir exemplos específicos de acordo com o caso
+
+Ao receber a critica do seu ultimo artigo {artigo}, voce recebera junto
+sua este artigo e voce deve:
+
+1. Fazer uma profunda reflexao sobre esta critica,
+pensando de maneira inteligente sobre o que deve ser
+melhorado e deve ser mantido.
+2. Planejar com cautela seu próximo texto para que nao sejam repetidos novos
+erros e deve se certificar que todas as melhorias foram implantada no
+seu texto
 3. Implantar essas melhorias no seu proximo texto gerado
 
 ##ATENÇAÕ##
 
 Se uma critica nao for enviada voce devera se atentar apenas aos textos
 de apoio enviados.
-
-Para criar o artigo, siga estas diretrizes:
-
-1. TEMA PRINCIPAL: {tema}
-2. MATERIAIS DE APOIO: {web_search}
-3. SE HOUVER, ATENTAR PARA CRITICA DO AVALIADOR: {critica}
-
-3. ESTRUTURA SOLICITADA:
-- Título chamativo
-- Introdução envolvente
-- Desenvolvimento do tema em tópicos
-- Conclusão
-
-4. ELEMENTOS ADICIONAIS:
-- Inclua dados estatísticos relevantes dos materiais de apoio
-- Adicione exemplos práticos
-- Utilize citações quando apropriado
-- Mantenha um fluxo natural entre os parágrafos
-
-5. OTIMIZAÇÃO:
-- Utilize subtítulos informativos
-- Mantenha parágrafos concisos
-- Inclua palavras-chave naturalmente
-- Evite jargões desnecessários
+Não mencione a critica recebida no seu proximo texto
+apenas a leia e siga as recomendações.
 
 Por favor, crie um artigo original que atenda a estes requisitos,
 mantendo um equilíbrio entre informação e engajamento do leitor.
-
-Você poderá receber uma critica sobre seu artigo e voce deve:
-
-1. Observar os pontos fortes apontados pelo a avaliador
-2. Observar o que ele apontar que deve ser melhorado na sua escrita
-3. Implantar essas melhorias no seu proximo texto gerado
 """
 
 prompt_escritor = ChatPromptTemplate.from_messages(
@@ -113,10 +120,13 @@ prompt_escritor = ChatPromptTemplate.from_messages(
         (
             "human",
             "Aqui esta o tema {tema} e os textos de apoios {web_search}. \
+            Aqui esta seu ultimo artigo {artigo} \
             Aqui esta a critica do avaliador {critica}",
         ),
     ]
 )
+model = "claude-3-5-sonnet-20241022"
+llm = ChatAnthropic(model=model, temperature=0.6, max_tokens=2000)
 escritor = prompt_escritor | llm | StrOutputParser()
 
 system_critico = """
@@ -172,23 +182,41 @@ prompt_critico = ChatPromptTemplate.from_messages(
     ]
 )
 
+llm = ChatAnthropic(model=model, temperature=0, max_tokens=1000)
 structured_llm_feedback = llm.with_structured_output(Editor_Feedback)
 critico = prompt_critico | structured_llm_feedback
 
+def format_searchs(searchs):
+  """
+Concatena o conteúdo de uma lista de resultados de pesquisa em uma única string.
+
+Argumentos:
+searchs (list of dict): Uma lista de dicionários, cada um contendo uma chave content.
+
+Retorna:
+str: Uma única string com conteúdo concatenado de cada dicionário na lista.
+    """
+  search = ""
+  for s in searchs:
+    search += s["content"]
+  return search
+
 def web_search(state: GraphState):
     """
-    Faz uma pesquisa web com base no tema e guarda os resultados no estado.
+    Executa uma pesquisa na web com base no tema fornecido no estado e armazena
+    os resultados no estado.
 
-    Args:
-        state (GraphState): Estado do gráfico
+    Argumentos:
+    state (GraphState): O estado atual do gráfico, contendo o tema
+    para o qual uma pesquisa na web será realizada.
 
-    Returns:
-        dict: Dicionário com a chave "web_search" e o valor com os resultados da
-        pesquisa.
+    Retorna:
+    dict: Um dicionário contendo os resultados da pesquisa na web sob a chave "web_search".
     """
     print("-----Web Search-----\n")
     tema = state["tema"]
     searchs = web_search_tool.invoke({"query": tema})
+    searchs = format_searchs(searchs)
     print("Resultados da pesquisa:", searchs)
 
     state["web_search"] = searchs
@@ -196,66 +224,98 @@ def web_search(state: GraphState):
 
 def escrever_artigo(state: GraphState):
     """
-    Gera um artigo a partir do tema e dos resultados da pesquisa web
-    
-    Args:
-        state (GraphState): O estado atual do gráfico
-    
-    Returns:
-        dict: O estado atualizado com a redação gerada
+    Gera um artigo com base no estado fornecido e atualiza o estado com
+    o conteúdo gerado.
+
+    Esta função usa o tema e os resultados da pesquisa na web do estado para criar
+    um artigo. Ela invoca um modelo de linguagem para gerar o artigo e atualiza
+    o estado com o novo artigo e contagem de iterações. O artigo gerado é
+    também impresso no console.
+
+    Argumentos:
+    estado (GraphState): O estado atual do gráfico, contendo o tema,
+    resultados da pesquisa na web, críticas anteriores e qualquer artigo
+    gerado anteriormente.
+
+    Retorna:
+    dict: Um dicionário com o artigo atualizado e contagem de iterações.
     """
-    textos_apoio = "\n".join([f"{result['content']} (Source: {result['url']})" for result in state["web_search"]])
+    textos_apoio = state["web_search"]
+
     tema = state["tema"]
-
     critica = state["critica"] if "critica" in state else ""
+    artigo = state["artigo"] if "artigo" in state else ""
+    iteracao = state["iteracoes"]
 
-    # Gerar a redação usando o prompt
-    artigo = escritor.invoke({"tema": tema, "web_search": textos_apoio, "critica":critica}).strip()
+    resposta = escritor.invoke({
+        "tema": tema, "web_search": textos_apoio,
+        "critica": critica,  "artigo": artigo
+        })
+
+    artigo = resposta.strip()
 
     # Atualizar o estado com a redação gerada
     state["artigo"] = artigo
 
     # Exibir a redação gerada
-    print("-----Artigo geradO:-----")
+    print(f"-----Artigo {iteracao} gerado:-----")
     print(artigo)
+    state["iteracoes"] += 1
 
     # Retornar o estado atualizado como um dicionário
-    return {"artigo": artigo}
+    return {"artigo": artigo, "iteracoes": state["iteracoes"]}
 
 def avaliar_artigo(state: GraphState):
     """
-    Avalia o artigo escrito e atualiza o estado com a nota e crítica.
+    Avalia um artigo do estado fornecido e atualiza o estado com
+    a pontuação de feedback e revisão.
 
-    Args:
-        state (GraphState): O estado atual do gráfico.
+    Esta função utiliza um modelo de linguagem para gerar feedback para o
+    artigo presente no estado. O feedback inclui uma revisão e uma pontuação
+    que são então usadas para atualizar o estado.
 
-    Returns:
-        dict: O estado atualizado com a nota e crítica do artigo.
+    Argumentos:
+    state (GraphState): O estado atual do gráfico, contendo o
+    artigo a ser avaliado.
+
+    Retorna:
+    dict: Um dicionário contendo o artigo, a pontuação de feedback sob
+    a chave "nota" e a revisão de feedback sob a chave "critica".
     """
-    print("-----AVALIAÇÃO-----")
+    print("-----CRITICA-----")
     artigo = state["artigo"]
 
     feedback = critico.invoke({"artigo": artigo})
-    print(feedback)
-
     state["critica"] = feedback.review
     state["nota"] = feedback.score
-    state["iteracoes"] += 1
+
+    print(feedback.review)
+
+    print("-----NOTA-----")
+    print(feedback.score)
+
+    return {"artigo": artigo,
+            "nota": feedback.score,
+            "critica": feedback.review}
 
 
-    return {"artigo": state["artigo"], "nota": state["nota"], "critica": state["critica"]}
-
-def decide_to_generate(state: GraphState, threshold: float, max_iteracoes: int):
+def decide_to_generate(state: GraphState,
+                       threshold: float,
+                       max_iteracoes: int):
     """
-    Decide se o artigo precisa ser refeito ou pode ser finalizado com base na nota e número de iterações.
+    Decida se deseja gerar outro artigo com base no estado atual.
 
-    Args:
-        state (GraphState): O estado atual do gráfico.
-        threshold (float): A nota mínima para finalizar o artigo.
-        max_iteracoes (int): O número máximo de iterações permitidas.
+    Argumentos:
+    state (GraphState): O estado atual do gráfico, contendo o
+    artigo a ser avaliado.
+    threshold (float): A pontuação mínima necessária para parar de gerar
+    artigos.
+    max_iteracoes (int): O número máximo de iterações para gerar
+    artigos.
 
-    Returns:
-        str: O nome do nó a ser executado em seguida. Pode ser "refazer" ou "finalizar".
+    Retorna:
+    str: A decisão de gerar outro artigo, seja "refazer" ou
+    "finalizar".
     """
     nota = state["nota"]
     iteracoes = state["iteracoes"]
@@ -269,7 +329,6 @@ def decide_to_generate(state: GraphState, threshold: float, max_iteracoes: int):
     else:
         return "finalizar"
 
-# @title Create the workflow
 work_flow = StateGraph(GraphState)
 work_flow.add_node("web_search_node", web_search)
 work_flow.add_node("escritor_node", escrever_artigo)
@@ -279,9 +338,8 @@ work_flow.add_edge(START, "web_search_node")
 work_flow.add_edge("web_search_node", "escritor_node")
 work_flow.add_edge("escritor_node", "critico_node")
 
-
 max_iteracoes = 3
-threshold = 8.0
+threshold = 9
 work_flow.add_conditional_edges(
     "critico_node",
     lambda state: decide_to_generate(state, threshold=threshold, max_iteracoes=max_iteracoes),
