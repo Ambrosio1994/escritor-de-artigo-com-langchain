@@ -1,24 +1,48 @@
 ![Fluxo LangChain](writer_crtic.png)
- 
- Este código é um exemplo de um sistema de geração de artigos automatizado usando uma LLM (Linguagem de Modelos de Largura) e avaliação por um especialista em análise textual. O sistema é composto por três principais componentes: pesquisa web, geração de artigos e avaliação do artigo.
 
-Componentes do Sistema
-Pesquisa Web: O código usa a ferramenta TavilySearchResults do pacote langchain_community.tools.tavily_search para realizar pesquisas na web com base no tema do artigo. 
-Os resultados são armazenados no estado do gráfico.
-Geração de Artigos: O código usa uma LLM, neste caso, ChatAnthropic, para gerar o artigo. O prompt de escrita é definido na variável prompt_escritor e o resultado é armazenado no estado do gráfico.
-Avaliação do Artigo: O código usa uma LLM, neste caso, ChatAnthropic, para avaliar o artigo. O prompt de avaliação é definido na variável prompt_critico e o resultado é armazenado no estado do gráfico.
-Fluxo do Sistema
-O fluxo do sistema é controlado por um gráfico de estado, chamado work_flow, que define as transições entre os diferentes nós do sistema. Os nós do gráfico são:
+ # 🖋️ Workflow Automatizado de Escrita e Avaliação de Artigos com LLMs
 
-web_search_node: Realiza a pesquisa web com base no tema do artigo.
-escritor_node: Gera o artigo com base nos resultados da pesquisa web.
-critico_node: Avalia o artigo gerado.
-O fluxo do sistema é definido pelas seguintes transições:
+Este projeto implementa um **fluxo de trabalho automatizado** para geração, avaliação e melhoria iterativa de artigos. Ele combina ferramentas como **LangChain**, **Tavily Search**, e **Anthropic LLMs** para criar artigos otimizados baseados em pesquisa web e críticas automáticas.
 
-START -> web_search_node
-web_search_node -> escritor_node
-escritor_node -> critico_node
-O fluxo do sistema também inclui uma transição condicional, que decide se o artigo precisa ser refeito ou pode ser finalizado com base na nota e número de iterações.
+---
 
-Variáveis de Ambiente
-O código requer duas variáveis de ambiente para funcionar corretamente: ANTHROPIC_API_KEY e TAVILY_API_KEY. Certifique-se de que essas variáveis estejam definidas corretamente antes de executar o código.
+## 📜 Descrição
+
+O sistema é projetado para:
+
+1. **Pesquisar conteúdo** relevante baseado em um tema específico.
+2. **Gerar artigos** usando um modelo de linguagem (LLM) treinado.
+3. **Avaliar os artigos** gerados com base em critérios técnicos e de qualidade textual.
+4. **Iterar o processo**, incorporando feedback para melhorar os resultados até atingir um padrão definido.
+
+O fluxo é organizado em nós e condições, permitindo a iteração automática até que o artigo atenda aos requisitos de qualidade estabelecidos.
+
+---
+
+## ✨ Funcionalidades
+
+- **Pesquisa na Web Automatizada**: Utiliza a API do **Tavily Search** para encontrar conteúdo relevante baseado no tema especificado.
+- **Geração de Artigos**: Usa o modelo **Anthropic Claude** para criar textos detalhados e bem estruturados.
+- **Avaliação de Artigos**: Um crítico automatizado fornece feedback detalhado, incluindo notas e sugestões de melhorias.
+- **Fluxo Iterativo**: O processo de geração e avaliação continua até que a qualidade do artigo atenda a um limite predefinido.
+- **Configuração Personalizável**: Permite ajustar o limite de qualidade (`threshold`) e o número máximo de iterações.
+
+---
+
+## 📋 Requisitos
+
+Certifique-se de ter o seguinte ambiente configurado:
+
+- **Python 3.8** ou superior.
+- **Chaves de API**:
+  - `ANTHROPIC_API_KEY` para acessar o modelo de linguagem.
+  - `TAVILY_API_KEY` para realizar pesquisas na web.
+
+Dependências Python:
+- `langchain-core`
+- `langchain-community`
+- `langgraph`
+- `pydantic`
+- `typing-extensions`
+
+---
